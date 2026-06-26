@@ -6,30 +6,63 @@
 
 void uart_init_access(void)
 {
+
+    // 1. Säkerställ att gammal driver inte stör
+    uart_driver_delete(UART_NUM_1);
+
     uart_config_t cfg = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE};
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT};
 
-    uart_param_config(ACCESS_UART, &cfg);
+    ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &cfg));
 
-    uart_set_pin(
-        ACCESS_UART,
-        GPIO_NUM_43, // TX
-        GPIO_NUM_44, // RX
+    // 2. Koppla pins (din hårdvara)
+    ESP_ERROR_CHECK(uart_set_pin(
+        UART_NUM_1,
+        GPIO_NUM_43, // TX1
+        GPIO_NUM_44, // RX0
         UART_PIN_NO_CHANGE,
-        UART_PIN_NO_CHANGE);
+        UART_PIN_NO_CHANGE));
 
-    uart_driver_install(
-        ACCESS_UART,
+    // 3. Viktigt: stabil RX (hindrar random UART errors)
+    gpio_set_pull_mode(GPIO_NUM_44, GPIO_PULLUP_ONLY);
+
+    // 4. Installera driver
+    ESP_ERROR_CHECK(uart_driver_install(
+        UART_NUM_1,
         1024,
         0,
         0,
         NULL,
-        0);
+        0));
 }
+// uart_config_t cfg = {
+//     .baud_rate = 115200,
+//     .data_bits = UART_DATA_8_BITS,
+//     .parity = UART_PARITY_DISABLE,
+//     .stop_bits = UART_STOP_BITS_1,
+//     .flow_ctrl = UART_HW_FLOWCTRL_DISABLE};
+
+// uart_param_config(ACCESS_UART, &cfg);
+
+// uart_set_pin(
+//     ACCESS_UART,
+//     GPIO_NUM_43, // TX
+//     GPIO_NUM_44, // RX
+//     UART_PIN_NO_CHANGE,
+//     UART_PIN_NO_CHANGE);
+
+// uart_driver_install(
+//     ACCESS_UART,
+//     1024,
+//     0,
+//     0,
+//     NULL,
+//     0);
 
 void uart_write_char(char c)
 {

@@ -166,13 +166,24 @@ void app_main(void)
   gpio_set_level(LED_PIN, 1);
   vTaskDelay(500 / portTICK_PERIOD_MS);
 
-  gpio_set_level(LED_PIN, 0);
-  vTaskDelay(500 / portTICK_PERIOD_MS);
-
   wifi_init_simple();
+  uart_init_access();
+
+  gpio_set_level(LED_PIN, 0);
+  vTaskDelay(5000 / portTICK_PERIOD_MS);
 
   while (1)
   {
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+
+    if (wifi_connected)
+    {
+      gpio_set_level(LED_PIN, 1);
+    }
+    else
+    {
+      gpio_set_level(LED_PIN, 0);
+    }
 
     if (uart_available() != 0)
     {
@@ -181,6 +192,13 @@ void app_main(void)
 
       if (wifi_connected)
       {
+
+        gpio_set_level(LED_PIN, 1);
+        // vTaskDelay(500 / portTICK_PERIOD_MS);
+
+        // gpio_set_level(LED_PIN, 0);
+        // vTaskDelay(500 / portTICK_PERIOD_MS);
+
         send_msg_to_api(msg);
 
         uart_write_char('u');
@@ -190,6 +208,7 @@ void app_main(void)
         uart_write_char('k');
         uart_write_char('\n');
       }
+      vTaskDelay(pdMS_TO_TICKS(10));
     }
   }
 }
@@ -203,6 +222,12 @@ void wifi_init_simple(void)
 
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   esp_wifi_init(&cfg);
+
+  esp_event_handler_register(
+      IP_EVENT,
+      IP_EVENT_STA_GOT_IP,
+      wifi_event_handler,
+      NULL);
 
   esp_event_handler_register(
       WIFI_EVENT,
@@ -228,7 +253,7 @@ void send_to_api(const char *json, const char *endpoint)
 
   char url[50];
   snprintf(url, sizeof(url),
-           "http://192.168.43.34:8000/%s",
+           "http://192.168.43.228:8000/%s",
            endpoint);
 
   esp_http_client_config_t config = {
