@@ -11,7 +11,7 @@ void uart_init_access(void)
     uart_driver_delete(UART_NUM_1);
 
     uart_config_t cfg = {
-        .baud_rate = 115200,
+        .baud_rate = 9600,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
