@@ -123,28 +123,6 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
 
   case HTTP_EVENT_ON_FINISH:
     response_buffer[response_len] = '\0'; // null-terminate
-    cJSON *root = cJSON_Parse(response_buffer);
-    cJSON *stat = cJSON_GetObjectItem(root, "status");
-    cJSON *siditem = cJSON_GetObjectItem(root, "sid");
-    // konvertera till uart och skicka tillbaka via tx1
-
-    if (cJSON_IsNumber(siditem) && cJSON_IsString(stat))
-    {
-      uint16_t sid = (uint16_t)siditem->valueint;
-
-      if (strcmp(stat->valuestring, "REQ_PIN") == 0)
-      {
-        access_send_pin_req(sid);
-      }
-      else if (strcmp(stat->valuestring, "OK") == 0)
-      {
-        access_send_ok(sid);
-      }
-      else if (strcmp(stat->valuestring, "PONG") == 0)
-      {
-        access_send_pong();
-      }
-    }
     break;
 
   case HTTP_EVENT_DISCONNECTED:
@@ -250,10 +228,12 @@ void wifi_init_simple(void)
 
 void send_to_api(const char *json, const char *endpoint)
 {
-
+    response_len = 0;
+  response_buffer[0] = '\0';
   char url[50];
+
   snprintf(url, sizeof(url),
-           "http://192.168.43.228:8000/%s",
+           "http://192.168.43.34:8000/%s",
            endpoint);
 
   esp_http_client_config_t config = {
@@ -273,6 +253,66 @@ void send_to_api(const char *json, const char *endpoint)
   if (err == ESP_OK)
   {
     int status = esp_http_client_get_status_code(client);
+    if (status == 200)
+    {
+      putchar('2');
+      putchar(':');
+      putchar('\n');
+      // for (int i = 0; response_buffer[i] != '\0'; i++)
+      // {
+      //   putchar(response_buffer[i]);
+      // }
+      // printf("RAW RESPONSE: %s\n", response_buffer);
+      cJSON *root = cJSON_Parse(response_buffer);
+
+      if (root == NULL)
+      {
+        printf("JSON parse failed\n");
+        return;
+      }
+
+      cJSON *stat = cJSON_GetObjectItem(root, "status");
+      cJSON *siditem = cJSON_GetObjectItem(root, "sid");
+
+      if (!stat || !siditem)
+      {
+        printf("Missing JSON fields\n");
+        cJSON_Delete(root);
+        return;
+      }
+      
+      if (cJSON_IsString(siditem) && siditem->valuestring != NULL && cJSON_IsString(stat))
+      {
+        putchar('a');
+
+        char *endptr;
+        long value = strtol(siditem->valuestring, &endptr, 10);
+        uint16_t sidint = (uint16_t)value;
+
+        if (strcmp(stat->valuestring, "REQ_PIN") == 0)
+        {
+          //s = access_send_pin_req(sidint); // send UART back TX-> RX
+          // printf("Sending REQ_PIN sid=%u\n", sidint);
+
+          if (s == ACCESS_STATUS_OK)
+          {
+             s = access_send_pin_req(sidint); // verkar inte fungera arduino får tillbaks uid! varifrån vet jag inte
+            //  printf("!");
+            //  printf("/n");
+          }
+        }
+        else if (strcmp(stat->valuestring, "OK") == 0)
+        {
+          access_send_ok(sidint);
+        }
+        else if (strcmp(stat->valuestring, "PONG") == 0)
+        {
+          access_send_pong();
+        }
+      }
+
+      cJSON_Delete(root);
+    }
     ESP_LOGI(TAG, "HTTP Status = %d", status);
   }
   else
@@ -281,4 +321,5 @@ void send_to_api(const char *json, const char *endpoint)
   }
 
   esp_http_client_cleanup(client);
+
 }
